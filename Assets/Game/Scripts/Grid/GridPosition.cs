@@ -1,13 +1,12 @@
 using System;
-using UnityEngine;
 
 namespace ShanMen.Grid
 {
     [Serializable]
-    public readonly struct GridPosition : IEquatable<GridPosition>
+    public struct GridPosition : IEquatable<GridPosition>
     {
-        public readonly int x;
-        public readonly int y;
+        public int x;
+        public int y;
 
         public GridPosition(int x, int y) { this.x = x; this.y = y; }
         public bool Equals(GridPosition other) => x == other.x && y == other.y;
