@@ -18,6 +18,7 @@ namespace ShanMen.Economy
     {
         public ResourceContainerRole role = ResourceContainerRole.Stockpile;
         [Min(1)] public int capacity = 100;
+        [Range(0, 5)] public int logisticsPriority = 2;
         public ResourceType[] accepted = Array.Empty<ResourceType>();
         public ResourceTarget[] desired = Array.Empty<ResourceTarget>();
         public ResourceAmount[] starting = Array.Empty<ResourceAmount>();
@@ -26,6 +27,7 @@ namespace ShanMen.Economy
         readonly Dictionary<ResourceType, int> _reservedPickup = new();
         readonly Dictionary<ResourceType, int> _reservedDropoff = new();
         ResourceLedger _ledger;
+        bool _initialized;
 
         public int TotalAmount
         {
@@ -56,9 +58,8 @@ namespace ShanMen.Economy
                 _reservedDropoff[type] = 0;
             }
 
-            if (starting == null) return;
-            for (int i = 0; i < starting.Length; i++)
-                _amounts[starting[i].type] = Mathf.Max(0, starting[i].amount);
+            _initialized = true;
+            ApplyStarting();
         }
 
         void Start()
@@ -79,7 +80,22 @@ namespace ShanMen.Economy
             desired = targets ?? Array.Empty<ResourceTarget>();
         }
 
-        public void SetStarting(ResourceAmount[] values) => starting = values ?? Array.Empty<ResourceAmount>();
+        public void SetStarting(ResourceAmount[] values)
+        {
+            starting = values ?? Array.Empty<ResourceAmount>();
+            if (_initialized) ApplyStarting();
+        }
+
+        void ApplyStarting()
+        {
+            foreach (ResourceType type in Enum.GetValues(typeof(ResourceType))) _amounts[type] = 0;
+            if (starting != null)
+            {
+                for (int i = 0; i < starting.Length; i++)
+                    _amounts[starting[i].type] = Mathf.Max(0, starting[i].amount);
+            }
+            NotifyChanged();
+        }
 
         public void Bind(ResourceLedger ledger)
         {
@@ -100,12 +116,50 @@ namespace ShanMen.Economy
             return 0;
         }
 
+        public void SetLogisticsPriority(int value)
+        {
+            logisticsPriority = Mathf.Clamp(value, 0, 5);
+            NotifyChanged();
+        }
+
         public bool Accepts(ResourceType type)
         {
             if (accepted == null || accepted.Length == 0) return true;
             for (int i = 0; i < accepted.Length; i++)
                 if (accepted[i] == type) return true;
             return false;
+        }
+
+        public void SetAccepted(ResourceType type, bool value)
+        {
+            var list = new List<ResourceType>();
+            if (accepted == null || accepted.Length == 0)
+            {
+                foreach (ResourceType candidate in Enum.GetValues(typeof(ResourceType)))
+                    if (candidate != type || value) list.Add(candidate);
+            }
+            else
+            {
+                list.AddRange(accepted);
+                bool contains = list.Contains(type);
+                if (value && !contains) list.Add(type);
+                if (!value && contains) list.Remove(type);
+            }
+
+            int resourceCount = Enum.GetValues(typeof(ResourceType)).Length;
+            accepted = list.Count >= resourceCount ? Array.Empty<ResourceType>() : list.ToArray();
+            NotifyChanged();
+        }
+
+        public ResourceAmount[] SnapshotContents()
+        {
+            var result = new List<ResourceAmount>();
+            foreach (ResourceType type in Enum.GetValues(typeof(ResourceType)))
+            {
+                int amount = Get(type);
+                if (amount > 0) result.Add(new ResourceAmount(type, amount));
+            }
+            return result.ToArray();
         }
 
         public int AvailableCapacityFor(ResourceType type)
