@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ShanMen.Buildings
 {
-    public enum BuildingBehavior { Producer, Processor, Cultivation, QiSource, Storage }
+    public enum BuildingBehavior { Producer, Processor, Cultivation, QiSource, Storage, Rest }
 
     [CreateAssetMenu(menuName = "ShanMen/Building Definition", fileName = "BuildingDefinition")]
     public sealed class BuildingDefinition : ScriptableObject
