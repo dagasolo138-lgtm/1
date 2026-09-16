@@ -111,9 +111,15 @@ namespace ShanMen.EditorTools
             priorityPanel.agents = agents;
             priorityPanel.ledger = ledger;
 
+            var buildToolbar = root.AddComponent<BuildToolbar>();
+            buildToolbar.buildController = build;
+
+            var stockpilePanel = root.AddComponent<StockpilePanel>();
+            stockpilePanel.ledger = ledger;
+
             EditorSceneManager.SaveScene(scene, "Assets/Game/Scenes/Prototype.unity");
             Selection.activeGameObject = root;
-            Debug.Log("[ShanMen] Prototype scene created. Play it, use 1-5 to select buildings, left click to place, right click to cancel.");
+            Debug.Log("[ShanMen] Prototype scene created. Use the build toolbar or 1-6. Right click cancels selection; with no selection, right click a construction site to refund delivered materials.");
         }
 
         static BuildingDefinition[] CreateBuildingDefinitions()
@@ -160,15 +166,24 @@ namespace ShanMen.EditorTools
 
             var stockpile = Upsert("Stockpile", d =>
             {
-                d.id = "stockpile"; d.displayName = "仓库"; d.description = "储存资源。生产建筑的产物会被搬运到这里。";
+                d.id = "stockpile"; d.displayName = "仓库"; d.description = "储存资源。可设置过滤和物流优先级。";
                 d.behavior = BuildingBehavior.Storage; d.visualPrimitive = PrimitiveType.Cube;
                 d.visualScale = new Vector3(0.9f, 0.45f, 0.9f); d.verticalOffset = 0.225f; d.visualColor = new Color(0.52f, 0.4f, 0.26f);
                 d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 12), new ResourceCost(ResourceType.Stone, 5) }; d.buildWork = 3f;
                 d.storageCapacity = 300; d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>();
             });
 
+            var bed = Upsert("SimpleBed", d =>
+            {
+                d.id = "simple_bed"; d.displayName = "简易床"; d.description = "体力不足的弟子会自动寻找空床休息。";
+                d.behavior = BuildingBehavior.Rest; d.visualPrimitive = PrimitiveType.Cube;
+                d.visualScale = new Vector3(0.85f, 0.22f, 1.2f); d.verticalOffset = 0.11f; d.visualColor = new Color(0.48f, 0.34f, 0.28f);
+                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 12) }; d.buildWork = 2.5f;
+                d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>();
+            });
+
             AssetDatabase.SaveAssets();
-            return new[] { field, workshop, mat, gatherer, stockpile };
+            return new[] { field, workshop, mat, gatherer, stockpile, bed };
         }
 
         static BuildingDefinition Upsert(string fileName, Action<BuildingDefinition> configure)
