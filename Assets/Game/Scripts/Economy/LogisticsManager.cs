@@ -40,6 +40,7 @@ namespace ShanMen.Economy
             if (ledger == null || jobs == null) return;
             PlanDemandHauls();
             PlanOutputHauls();
+            PlanStockpileBalancing();
         }
 
         void PlanDemandHauls()
@@ -84,6 +85,25 @@ namespace ShanMen.Economy
             }
         }
 
+        void PlanStockpileBalancing()
+        {
+            for (int i = 0; i < ledger.Containers.Count; i++)
+            {
+                ResourceContainer destination = ledger.Containers[i];
+                if (destination == null || destination.role != ResourceContainerRole.Stockpile || destination.logisticsPriority <= 0) continue;
+
+                foreach (ResourceType type in Enum.GetValues(typeof(ResourceType)))
+                {
+                    if (!destination.Accepts(type) || destination.AvailableCapacityFor(type) <= 0) continue;
+                    ResourceContainer source = FindLowerPriorityStockpile(destination, type);
+                    if (source == null) continue;
+
+                    int amount = Mathf.Min(maxStackSize, source.AvailableForPickup(type), destination.AvailableCapacityFor(type));
+                    if (amount > 0) jobs.AddHaul(source, destination, type, amount);
+                }
+            }
+        }
+
         ResourceContainer FindBestSource(ResourceContainer destination, ResourceType type)
         {
             ResourceContainer best = null;
@@ -95,7 +115,7 @@ namespace ShanMen.Economy
                 if (candidate.role != ResourceContainerRole.Output && candidate.role != ResourceContainerRole.Stockpile) continue;
                 if (candidate.AvailableForPickup(type) <= 0) continue;
 
-                float roleBias = candidate.role == ResourceContainerRole.Output ? -4f : 0f;
+                float roleBias = candidate.role == ResourceContainerRole.Output ? -20f : candidate.logisticsPriority * 8f;
                 float score = Vector3.Distance(candidate.transform.position, destination.transform.position) + roleBias;
                 if (score >= bestScore) continue;
                 bestScore = score;
@@ -107,15 +127,37 @@ namespace ShanMen.Economy
         ResourceContainer FindBestStockpile(ResourceContainer source, ResourceType type)
         {
             ResourceContainer best = null;
-            float bestDistance = float.PositiveInfinity;
+            float bestScore = float.NegativeInfinity;
             for (int i = 0; i < ledger.Containers.Count; i++)
             {
                 ResourceContainer candidate = ledger.Containers[i];
                 if (candidate == null || candidate == source || candidate.role != ResourceContainerRole.Stockpile) continue;
-                if (candidate.AvailableCapacityFor(type) <= 0) continue;
+                if (!candidate.Accepts(type) || candidate.AvailableCapacityFor(type) <= 0) continue;
+
                 float distance = Vector3.Distance(source.transform.position, candidate.transform.position);
-                if (distance >= bestDistance) continue;
-                bestDistance = distance;
+                float score = candidate.logisticsPriority * 100f - distance;
+                if (score <= bestScore) continue;
+                bestScore = score;
+                best = candidate;
+            }
+            return best;
+        }
+
+        ResourceContainer FindLowerPriorityStockpile(ResourceContainer destination, ResourceType type)
+        {
+            ResourceContainer best = null;
+            float bestScore = float.PositiveInfinity;
+            for (int i = 0; i < ledger.Containers.Count; i++)
+            {
+                ResourceContainer candidate = ledger.Containers[i];
+                if (candidate == null || candidate == destination || candidate.role != ResourceContainerRole.Stockpile) continue;
+                if (candidate.logisticsPriority >= destination.logisticsPriority || candidate.AvailableForPickup(type) <= 0) continue;
+
+                float priorityPenalty = candidate.logisticsPriority * 20f;
+                float distance = Vector3.Distance(candidate.transform.position, destination.transform.position);
+                float score = priorityPenalty + distance;
+                if (score >= bestScore) continue;
+                bestScore = score;
                 best = candidate;
             }
             return best;
