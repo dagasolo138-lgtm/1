@@ -1,4 +1,5 @@
 using System;
+using ShanMen.Characters;
 using ShanMen.Core;
 using ShanMen.Cultivation;
 using ShanMen.Economy;
@@ -91,6 +92,9 @@ namespace ShanMen.Buildings
                     if (source == null) source = gameObject.AddComponent<QiSource>();
                     source.strength = definition.qiStrength;
                     source.radius = definition.qiRadius;
+                    break;
+                case BuildingBehavior.Rest:
+                    if (GetComponent<RestSpot>() == null) gameObject.AddComponent<RestSpot>();
                     break;
             }
         }
