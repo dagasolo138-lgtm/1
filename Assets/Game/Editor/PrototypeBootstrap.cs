@@ -7,9 +7,11 @@ using ShanMen.Core;
 using ShanMen.Cultivation;
 using ShanMen.Debugging;
 using ShanMen.Economy;
+using ShanMen.FiveElements;
 using ShanMen.Grid;
 using ShanMen.Jobs;
 using ShanMen.UI;
+using ShanMen.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -19,200 +21,42 @@ namespace ShanMen.EditorTools
 {
     public static class PrototypeBootstrap
     {
-        const string DataFolder = "Assets/Game/Data/Buildings";
-
+        const string DataFolder="Assets/Game/Data/Buildings";
         [MenuItem("Tools/ShanMen/Create Prototype Scene")]
         public static void CreatePrototypeScene()
         {
-            EnsureFolders();
-            BuildingDefinition[] definitions = CreateBuildingDefinitions();
-
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
-            var root = new GameObject("SimulationRoot");
-            var clock = root.AddComponent<GameClock>();
-            var grid = root.AddComponent<GridMap>();
-            var ledger = root.AddComponent<ResourceLedger>();
-            var jobs = root.AddComponent<JobBoard>();
-            var qiField = root.AddComponent<QiField>();
-            qiField.grid = grid;
-
-            var logistics = root.AddComponent<LogisticsManager>();
-            logistics.clock = clock;
-            logistics.ledger = ledger;
-            logistics.jobs = jobs;
-
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground";
-            ground.transform.position = new Vector3(grid.width * 0.5f, 0f, grid.height * 0.5f);
-            ground.transform.localScale = new Vector3(grid.width / 10f, 1f, grid.height / 10f);
-
-            var camGo = new GameObject("Main Camera");
-            var camera = camGo.AddComponent<Camera>();
-            camGo.tag = "MainCamera";
-            camGo.transform.position = new Vector3(12f, 20f, -11f);
-            camGo.transform.rotation = Quaternion.Euler(52f, 0f, 0f);
-            camera.fieldOfView = 55f;
-
-            var lightGo = new GameObject("Directional Light");
-            var light = lightGo.AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = 1.1f;
-            lightGo.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
-
-            var build = root.AddComponent<BuildController>();
-            build.worldCamera = camera;
-            build.grid = grid;
-            build.ledger = ledger;
-            build.definitions = definitions;
-
-            BuildingDefinition stockpile = FindDefinition(definitions, "stockpile");
-            build.CreateCompletedBuilding(stockpile, new GridPosition(3, 3), new[]
-            {
-                new ResourceAmount(ResourceType.Wood, 120),
-                new ResourceAmount(ResourceType.Stone, 80),
-                new ResourceAmount(ResourceType.Food, 50),
-                new ResourceAmount(ResourceType.Herb, 6),
-                new ResourceAmount(ResourceType.SpiritStone, 10),
-            });
-
-            var naturalQiGo = new GameObject("NaturalSpiritVein");
-            naturalQiGo.transform.position = new Vector3(17f, 0.2f, 15f);
-            var naturalQi = naturalQiGo.AddComponent<QiSource>();
-            naturalQi.strength = 45f;
-            naturalQi.radius = 8f;
-
-            var agents = new CultivatorAgent[3];
-            for (int i = 0; i < agents.Length; i++)
-            {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                go.name = $"Disciple_{i + 1}";
-                go.transform.position = new Vector3(5f + i * 1.5f, 1f, 5f);
-                go.AddComponent<CultivationProgress>();
-                var agent = go.AddComponent<CultivatorAgent>();
-                agent.displayName = i switch { 0 => "青禾", 1 => "陆离", _ => "阿石" };
-                agent.haulingPriority = i == 2 ? 5 : 3;
-                agent.buildingPriority = 4;
-                agent.farmingPriority = i == 0 ? 5 : 2;
-                agent.craftingPriority = i == 1 ? 5 : 2;
-                agent.cultivationPriority = i == 2 ? 4 : 1;
-                agent.Bind(jobs);
-                agents[i] = agent;
-            }
-
-            var controls = root.AddComponent<PrototypeControls>();
-            controls.clock = clock;
-            controls.ledger = ledger;
-            controls.jobs = jobs;
-            controls.qiField = qiField;
-            controls.agents = agents;
-
-            var priorityPanel = root.AddComponent<WorkPriorityPanel>();
-            priorityPanel.agents = agents;
-            priorityPanel.ledger = ledger;
-
-            var buildToolbar = root.AddComponent<BuildToolbar>();
-            buildToolbar.buildController = build;
-
-            var stockpilePanel = root.AddComponent<StockpilePanel>();
-            stockpilePanel.ledger = ledger;
-
-            EditorSceneManager.SaveScene(scene, "Assets/Game/Scenes/Prototype.unity");
-            Selection.activeGameObject = root;
-            Debug.Log("[ShanMen] Prototype scene created. Use the build toolbar or 1-6. Right click cancels selection; with no selection, right click a construction site to refund delivered materials.");
+            EnsureFolders();BuildingDefinition[] definitions=CreateBuildingDefinitions();Scene scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
+            var root=new GameObject("SimulationRoot");var clock=root.AddComponent<GameClock>();var grid=root.AddComponent<GridMap>();var ledger=root.AddComponent<ResourceLedger>();var jobs=root.AddComponent<JobBoard>();var qiField=root.AddComponent<QiField>();qiField.grid=grid;var fiveField=root.AddComponent<FiveElementField>();fiveField.grid=grid;var logistics=root.AddComponent<LogisticsManager>();logistics.clock=clock;logistics.ledger=ledger;logistics.jobs=jobs;
+            var ground=GameObject.CreatePrimitive(PrimitiveType.Plane);ground.name="Ground";ground.transform.position=new Vector3(grid.width*0.5f,0f,grid.height*0.5f);ground.transform.localScale=new Vector3(grid.width/10f,1f,grid.height/10f);
+            var camGo=new GameObject("Main Camera");var camera=camGo.AddComponent<Camera>();camGo.tag="MainCamera";camGo.transform.position=new Vector3(12f,20f,-11f);camGo.transform.rotation=Quaternion.Euler(52f,0f,0f);camera.fieldOfView=55f;
+            var lightGo=new GameObject("Directional Light");var light=lightGo.AddComponent<Light>();light.type=LightType.Directional;light.intensity=1.1f;lightGo.transform.rotation=Quaternion.Euler(48f,-35f,0f);
+            var build=root.AddComponent<BuildController>();build.worldCamera=camera;build.grid=grid;build.ledger=ledger;build.definitions=definitions;
+            BuildingDefinition stockpile=FindDefinition(definitions,"stockpile");build.CreateCompletedBuilding(stockpile,new GridPosition(3,3),new[]{new ResourceAmount(ResourceType.Wood,90),new ResourceAmount(ResourceType.Stone,55),new ResourceAmount(ResourceType.Food,42),new ResourceAmount(ResourceType.Herb,4),new ResourceAmount(ResourceType.SpiritStone,8)});
+            BuildingDefinition road=FindDefinition(definitions,"stone_path");GridPosition[] starterRoad={new(5,4),new(6,4),new(7,4),new(8,4),new(8,5),new(8,6)};for(int i=0;i<starterRoad.Length;i++)build.CreateCompletedBuilding(road,starterRoad[i],null);
+            var naturalQiGo=new GameObject("NaturalSpiritVein");naturalQiGo.transform.position=grid.GridToWorld(new GridPosition(17,15))+Vector3.up*0.2f;var naturalQi=naturalQiGo.AddComponent<QiSource>();naturalQi.strength=45f;naturalQi.radius=8f;var waterSource=naturalQiGo.AddComponent<FiveElementSource>();waterSource.Configure(FiveElement.Water,36f,7f);
+            CreateNaturalResources(grid);
+            var agents=new CultivatorAgent[3];for(int i=0;i<agents.Length;i++){var go=GameObject.CreatePrimitive(PrimitiveType.Capsule);go.name=$"Disciple_{i+1}";go.transform.position=new Vector3(5f+i*1.5f,1f,6f);go.AddComponent<CultivationProgress>();var agent=go.AddComponent<CultivatorAgent>();agent.displayName=i switch{0=>"青禾",1=>"陆离",_=>"阿石"};agent.haulingPriority=i==2?5:3;agent.buildingPriority=4;agent.gatheringPriority=i==0?5:3;agent.farmingPriority=i==0?5:2;agent.craftingPriority=i==1?5:2;agent.cultivationPriority=i==2?4:1;agent.Bind(jobs);agents[i]=agent;}
+            var controls=root.AddComponent<PrototypeControls>();controls.clock=clock;controls.ledger=ledger;controls.jobs=jobs;controls.qiField=qiField;controls.agents=agents;
+            var priorityPanel=root.AddComponent<WorkPriorityPanel>();priorityPanel.agents=agents;priorityPanel.ledger=ledger;var buildToolbar=root.AddComponent<BuildToolbar>();buildToolbar.buildController=build;var stockpilePanel=root.AddComponent<StockpilePanel>();stockpilePanel.ledger=ledger;var gatherController=root.AddComponent<GatherDesignationController>();gatherController.worldCamera=camera;gatherController.buildController=build;var probe=root.AddComponent<EnvironmentProbePanel>();probe.worldCamera=camera;probe.grid=grid;probe.qiField=qiField;probe.fiveElementField=fiveField;
+            EditorSceneManager.SaveScene(scene,"Assets/Game/Scenes/Prototype.unity");Selection.activeGameObject=root;Debug.Log("[ShanMen] Prototype scene created. Build with toolbar/1-7. Click natural resource nodes to designate gathering. Roads affect A* travel cost. Hover ground to inspect Qi and Five Elements.");
         }
-
         static BuildingDefinition[] CreateBuildingDefinitions()
         {
-            var field = Upsert("SpiritField", d =>
-            {
-                d.id = "spirit_field"; d.displayName = "灵田"; d.description = "产出食物与灵草，产物需要弟子搬回仓库。";
-                d.behavior = BuildingBehavior.Producer; d.visualPrimitive = PrimitiveType.Cube;
-                d.visualScale = new Vector3(0.9f, 0.25f, 0.9f); d.verticalOffset = 0.125f; d.visualColor = new Color(0.35f, 0.62f, 0.28f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 8) }; d.buildWork = 2.5f;
-                d.workType = JobType.Farm; d.jobIntervalTicks = 4; d.jobWork = 2.5f;
-                d.inputs = Array.Empty<ResourceCost>(); d.outputs = new[] { new ResourceCost(ResourceType.Food, 4), new ResourceCost(ResourceType.Herb, 1) }; d.outputCapacity = 30;
-            });
-
-            var workshop = Upsert("Workshop", d =>
-            {
-                d.id = "workshop"; d.displayName = "炼制工坊"; d.description = "需要先把灵草搬入工坊，再加工成灵石。";
-                d.behavior = BuildingBehavior.Processor; d.visualPrimitive = PrimitiveType.Cube;
-                d.visualScale = new Vector3(0.9f, 1f, 0.9f); d.verticalOffset = 0.5f; d.visualColor = new Color(0.62f, 0.42f, 0.24f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 15), new ResourceCost(ResourceType.Stone, 12) }; d.buildWork = 4f;
-                d.workType = JobType.Craft; d.jobIntervalTicks = 6; d.jobWork = 3.5f;
-                d.inputs = new[] { new ResourceCost(ResourceType.Herb, 2) }; d.outputs = new[] { new ResourceCost(ResourceType.SpiritStone, 1) };
-                d.inputBufferCycles = 3; d.inputCapacity = 20; d.outputCapacity = 12;
-            });
-
-            var mat = Upsert("MeditationMat", d =>
-            {
-                d.id = "meditation_mat"; d.displayName = "蒲团"; d.description = "弟子可在此修炼。";
-                d.behavior = BuildingBehavior.Cultivation; d.visualPrimitive = PrimitiveType.Cylinder;
-                d.visualScale = new Vector3(0.75f, 0.08f, 0.75f); d.verticalOffset = 0.08f; d.visualColor = new Color(0.42f, 0.48f, 0.72f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 10), new ResourceCost(ResourceType.Stone, 3) }; d.buildWork = 2f;
-                d.workType = JobType.Cultivate; d.jobIntervalTicks = 3; d.jobWork = 4f;
-                d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>();
-            });
-
-            var gatherer = Upsert("SpiritGatherer", d =>
-            {
-                d.id = "spirit_gatherer"; d.displayName = "聚灵台"; d.description = "提高周围灵气浓度。";
-                d.behavior = BuildingBehavior.QiSource; d.visualPrimitive = PrimitiveType.Cylinder;
-                d.visualScale = new Vector3(0.8f, 0.7f, 0.8f); d.verticalOffset = 0.35f; d.visualColor = new Color(0.36f, 0.72f, 0.8f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Stone, 18), new ResourceCost(ResourceType.SpiritStone, 4) }; d.buildWork = 5f;
-                d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>(); d.qiStrength = 35f; d.qiRadius = 6f;
-            });
-
-            var stockpile = Upsert("Stockpile", d =>
-            {
-                d.id = "stockpile"; d.displayName = "仓库"; d.description = "储存资源。可设置过滤和物流优先级。";
-                d.behavior = BuildingBehavior.Storage; d.visualPrimitive = PrimitiveType.Cube;
-                d.visualScale = new Vector3(0.9f, 0.45f, 0.9f); d.verticalOffset = 0.225f; d.visualColor = new Color(0.52f, 0.4f, 0.26f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 12), new ResourceCost(ResourceType.Stone, 5) }; d.buildWork = 3f;
-                d.storageCapacity = 300; d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>();
-            });
-
-            var bed = Upsert("SimpleBed", d =>
-            {
-                d.id = "simple_bed"; d.displayName = "简易床"; d.description = "体力不足的弟子会自动寻找空床休息。";
-                d.behavior = BuildingBehavior.Rest; d.visualPrimitive = PrimitiveType.Cube;
-                d.visualScale = new Vector3(0.85f, 0.22f, 1.2f); d.verticalOffset = 0.11f; d.visualColor = new Color(0.48f, 0.34f, 0.28f);
-                d.buildCosts = new[] { new ResourceCost(ResourceType.Wood, 12) }; d.buildWork = 2.5f;
-                d.inputs = Array.Empty<ResourceCost>(); d.outputs = Array.Empty<ResourceCost>();
-            });
-
-            AssetDatabase.SaveAssets();
-            return new[] { field, workshop, mat, gatherer, stockpile, bed };
+            var field=Upsert("SpiritField",d=>{ResetCommon(d);d.id="spirit_field";d.displayName="灵田";d.description="2x2 灵田。水生木，靠近水性环境时耕作更快；金性环境会压制。";d.behavior=BuildingBehavior.Producer;d.footprint=new Vector2Int(2,2);d.visualPrimitive=PrimitiveType.Cube;d.visualScale=new Vector3(0.9f,0.25f,0.9f);d.verticalOffset=0.125f;d.visualColor=new Color(0.35f,0.62f,0.28f);d.buildCosts=new[]{new ResourceCost(ResourceType.Wood,10),new ResourceCost(ResourceType.Stone,2)};d.buildWork=3f;d.workType=JobType.Farm;d.jobIntervalTicks=4;d.jobWork=2.5f;d.outputs=new[]{new ResourceCost(ResourceType.Food,4),new ResourceCost(ResourceType.Herb,1)};d.outputCapacity=30;d.element=FiveElement.Wood;d.elementSourceStrength=8f;d.elementRadius=4f;d.environmentSensitivity=0.8f;});
+            var workshop=Upsert("Workshop",d=>{ResetCommon(d);d.id="workshop";d.displayName="炼制工坊";d.description="2x2 火性工坊。木生火，水克火；环境会影响单次制造所需时间。";d.behavior=BuildingBehavior.Processor;d.footprint=new Vector2Int(2,2);d.visualPrimitive=PrimitiveType.Cube;d.visualScale=new Vector3(0.9f,1f,0.9f);d.verticalOffset=0.5f;d.visualColor=new Color(0.62f,0.42f,0.24f);d.buildCosts=new[]{new ResourceCost(ResourceType.Wood,15),new ResourceCost(ResourceType.Stone,12)};d.buildWork=4f;d.workType=JobType.Craft;d.jobIntervalTicks=6;d.jobWork=3.5f;d.inputs=new[]{new ResourceCost(ResourceType.Herb,2)};d.outputs=new[]{new ResourceCost(ResourceType.SpiritStone,1)};d.inputBufferCycles=3;d.inputCapacity=20;d.outputCapacity=12;d.element=FiveElement.Fire;d.elementSourceStrength=12f;d.elementRadius=4.5f;d.environmentSensitivity=0.85f;});
+            var mat=Upsert("MeditationMat",d=>{ResetCommon(d);d.id="meditation_mat";d.displayName="蒲团";d.description="弟子可在此修炼。水性环境能略微缩短修炼工作时间。";d.behavior=BuildingBehavior.Cultivation;d.visualPrimitive=PrimitiveType.Cylinder;d.visualScale=new Vector3(0.75f,0.08f,0.75f);d.verticalOffset=0.08f;d.visualColor=new Color(0.42f,0.48f,0.72f);d.buildCosts=new[]{new ResourceCost(ResourceType.Wood,10),new ResourceCost(ResourceType.Stone,3)};d.buildWork=2f;d.workType=JobType.Cultivate;d.jobIntervalTicks=3;d.jobWork=4f;d.element=FiveElement.Water;d.elementSourceStrength=3f;d.elementRadius=2.5f;d.environmentSensitivity=0.4f;});
+            var gatherer=Upsert("SpiritGatherer",d=>{ResetCommon(d);d.id="spirit_gatherer";d.displayName="聚灵台";d.description="2x2 聚灵台，提高周围灵气，同时形成水性环境。";d.behavior=BuildingBehavior.QiSource;d.footprint=new Vector2Int(2,2);d.visualPrimitive=PrimitiveType.Cylinder;d.visualScale=new Vector3(0.8f,0.7f,0.8f);d.verticalOffset=0.35f;d.visualColor=new Color(0.36f,0.72f,0.8f);d.buildCosts=new[]{new ResourceCost(ResourceType.Stone,18),new ResourceCost(ResourceType.SpiritStone,4)};d.buildWork=5f;d.qiStrength=35f;d.qiRadius=6f;d.element=FiveElement.Water;d.elementSourceStrength=18f;d.elementRadius=5f;d.environmentSensitivity=0f;});
+            var stockpile=Upsert("Stockpile",d=>{ResetCommon(d);d.id="stockpile";d.displayName="仓库";d.description="2x2 仓库。储存资源，可设置过滤和物流优先级。";d.behavior=BuildingBehavior.Storage;d.footprint=new Vector2Int(2,2);d.visualPrimitive=PrimitiveType.Cube;d.visualScale=new Vector3(0.9f,0.45f,0.9f);d.verticalOffset=0.225f;d.visualColor=new Color(0.52f,0.4f,0.26f);d.buildCosts=new[]{new ResourceCost(ResourceType.Wood,12),new ResourceCost(ResourceType.Stone,5)};d.buildWork=3f;d.storageCapacity=300;d.element=FiveElement.Earth;d.elementSourceStrength=4f;d.elementRadius=3f;d.environmentSensitivity=0f;});
+            var bed=Upsert("SimpleBed",d=>{ResetCommon(d);d.id="simple_bed";d.displayName="简易床";d.description="1x2 床位。体力不足的弟子会自动寻找空床休息。";d.behavior=BuildingBehavior.Rest;d.footprint=new Vector2Int(1,2);d.visualPrimitive=PrimitiveType.Cube;d.visualScale=new Vector3(0.85f,0.22f,0.55f);d.verticalOffset=0.11f;d.visualColor=new Color(0.48f,0.34f,0.28f);d.buildCosts=new[]{new ResourceCost(ResourceType.Wood,12)};d.buildWork=2.5f;d.element=FiveElement.Wood;d.elementSourceStrength=2f;d.elementRadius=2f;d.environmentSensitivity=0f;});
+            var road=Upsert("StonePath",d=>{ResetCommon(d);d.id="stone_path";d.displayName="石板路";d.description="降低行走成本。A* 寻路会主动偏好道路，适合连接仓库与生产区。";d.behavior=BuildingBehavior.Road;d.visualPrimitive=PrimitiveType.Cube;d.visualScale=new Vector3(0.92f,0.07f,0.92f);d.verticalOffset=0.035f;d.visualColor=new Color(0.48f,0.5f,0.52f);d.buildCosts=new[]{new ResourceCost(ResourceType.Stone,1)};d.buildWork=0.35f;d.roadSpeedMultiplier=1.65f;});
+            AssetDatabase.SaveAssets();return new[]{field,workshop,mat,gatherer,stockpile,bed,road};
         }
-
-        static BuildingDefinition Upsert(string fileName, Action<BuildingDefinition> configure)
-        {
-            string path = $"{DataFolder}/{fileName}.asset";
-            BuildingDefinition definition = AssetDatabase.LoadAssetAtPath<BuildingDefinition>(path);
-            if (definition == null)
-            {
-                definition = ScriptableObject.CreateInstance<BuildingDefinition>();
-                AssetDatabase.CreateAsset(definition, path);
-            }
-            configure(definition);
-            EditorUtility.SetDirty(definition);
-            return definition;
-        }
-
-        static BuildingDefinition FindDefinition(BuildingDefinition[] definitions, string id)
-        {
-            for (int i = 0; i < definitions.Length; i++)
-                if (definitions[i] != null && definitions[i].id == id) return definitions[i];
-            return null;
-        }
-
-        static void EnsureFolders()
-        {
-            Directory.CreateDirectory("Assets/Game/Scenes");
-            Directory.CreateDirectory(DataFolder);
-            AssetDatabase.Refresh();
-        }
+        static void ResetCommon(BuildingDefinition d){d.footprint=Vector2Int.one;d.inputs=Array.Empty<ResourceCost>();d.outputs=Array.Empty<ResourceCost>();d.inputBufferCycles=3;d.inputCapacity=40;d.outputCapacity=40;d.storageCapacity=300;d.roadSpeedMultiplier=1.6f;d.qiStrength=0f;d.qiRadius=6f;d.element=FiveElement.Neutral;d.elementSourceStrength=0f;d.elementRadius=4f;d.environmentSensitivity=0.35f;}
+        static void CreateNaturalResources(GridMap grid){CreateNaturalNode(grid,"古灵木",new GridPosition(9,8),ResourceType.Wood,24,3.8f,FiveElement.Wood,18f,4f,new Color(0.22f,0.5f,0.24f),PrimitiveType.Cylinder,new Vector3(0.55f,1.2f,0.55f));CreateNaturalNode(grid,"古灵木",new GridPosition(11,9),ResourceType.Wood,24,3.8f,FiveElement.Wood,18f,4f,new Color(0.22f,0.5f,0.24f),PrimitiveType.Cylinder,new Vector3(0.55f,1.2f,0.55f));CreateNaturalNode(grid,"巨石",new GridPosition(14,6),ResourceType.Stone,28,4.5f,FiveElement.Earth,20f,4f,new Color(0.45f,0.4f,0.34f),PrimitiveType.Sphere,new Vector3(0.9f,0.75f,0.9f));CreateNaturalNode(grid,"巨石",new GridPosition(16,7),ResourceType.Stone,28,4.5f,FiveElement.Earth,20f,4f,new Color(0.45f,0.4f,0.34f),PrimitiveType.Sphere,new Vector3(0.9f,0.75f,0.9f));CreateNaturalNode(grid,"金纹矿",new GridPosition(19,9),ResourceType.Stone,36,5.5f,FiveElement.Metal,28f,5f,new Color(0.6f,0.58f,0.48f),PrimitiveType.Sphere,new Vector3(1f,0.85f,1f));CreateNaturalNode(grid,"灵草丛",new GridPosition(7,15),ResourceType.Herb,12,3f,FiveElement.Wood,12f,3f,new Color(0.3f,0.72f,0.34f),PrimitiveType.Sphere,new Vector3(0.55f,0.35f,0.55f));CreateNaturalNode(grid,"灵草丛",new GridPosition(9,16),ResourceType.Herb,12,3f,FiveElement.Wood,12f,3f,new Color(0.3f,0.72f,0.34f),PrimitiveType.Sphere,new Vector3(0.55f,0.35f,0.55f));CreateNaturalNode(grid,"灵晶",new GridPosition(19,18),ResourceType.SpiritStone,6,6f,FiveElement.Water,24f,5f,new Color(0.3f,0.76f,0.88f),PrimitiveType.Cylinder,new Vector3(0.45f,0.9f,0.45f));}
+        static void CreateNaturalNode(GridMap grid,string objectName,GridPosition cell,ResourceType resourceType,int amount,float work,FiveElement element,float strength,float radius,Color color,PrimitiveType primitive,Vector3 scale){GameObject go=GameObject.CreatePrimitive(primitive);go.name=objectName;go.transform.position=grid.GridToWorld(cell)+Vector3.up*(scale.y*0.5f);go.transform.localScale=scale;Renderer renderer=go.GetComponent<Renderer>();if(renderer!=null)renderer.material.color=color;NaturalResourceNode node=go.AddComponent<NaturalResourceNode>();node.Configure(cell,resourceType,amount,work,element,strength,radius);}
+        static BuildingDefinition Upsert(string fileName,Action<BuildingDefinition> configure){string path=$"{DataFolder}/{fileName}.asset";BuildingDefinition definition=AssetDatabase.LoadAssetAtPath<BuildingDefinition>(path);if(definition==null){definition=ScriptableObject.CreateInstance<BuildingDefinition>();AssetDatabase.CreateAsset(definition,path);}configure(definition);EditorUtility.SetDirty(definition);return definition;}
+        static BuildingDefinition FindDefinition(BuildingDefinition[] definitions,string id){for(int i=0;i<definitions.Length;i++)if(definitions[i]!=null&&definitions[i].id==id)return definitions[i];return null;}
+        static void EnsureFolders(){Directory.CreateDirectory("Assets/Game/Scenes");Directory.CreateDirectory(DataFolder);AssetDatabase.Refresh();}
     }
 }
 #endif

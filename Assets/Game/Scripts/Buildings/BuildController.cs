@@ -8,161 +8,19 @@ namespace ShanMen.Buildings
 {
     public sealed class BuildController : MonoBehaviour
     {
-        public Camera worldCamera;
-        public GridMap grid;
-        public ResourceLedger ledger;
-        public BuildingDefinition[] definitions = Array.Empty<BuildingDefinition>();
-
-        public int SelectedIndex { get; private set; } = -1;
-        public BuildingDefinition Selected => SelectedIndex >= 0 && SelectedIndex < definitions.Length ? definitions[SelectedIndex] : null;
-        public event Action SelectionChanged;
-
-        public void SelectIndex(int index)
-        {
-            int next = index >= 0 && index < definitions.Length ? index : -1;
-            if (SelectedIndex == next) return;
-            SelectedIndex = next;
-            SelectionChanged?.Invoke();
-        }
-
-        public void Cancel()
-        {
-            if (SelectedIndex < 0) return;
-            SelectedIndex = -1;
-            SelectionChanged?.Invoke();
-        }
-
-        void Start()
-        {
-            if (worldCamera == null) worldCamera = Camera.main;
-            if (grid == null) grid = FindFirstObjectByType<GridMap>();
-            if (ledger == null) ledger = FindFirstObjectByType<ResourceLedger>();
-        }
-
-        void Update()
-        {
-            for (int i = 0; i < definitions.Length && i < 9; i++)
-            {
-                KeyCode key = (KeyCode)((int)KeyCode.Alpha1 + i);
-                if (Input.GetKeyDown(key)) SelectIndex(i);
-            }
-
-            if (Input.GetMouseButtonDown(1))
-            {
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-                if (Selected != null) Cancel();
-                else TryCancelConstructionAtMouse();
-                return;
-            }
-
-            if (Selected != null && Input.GetMouseButtonDown(0))
-            {
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-                TryPlaceAtMouse();
-            }
-        }
-
-        void TryPlaceAtMouse()
-        {
-            if (worldCamera == null || grid == null || Selected == null) return;
-            Ray ray = worldCamera.ScreenPointToRay(Input.mousePosition);
-            Plane ground = new Plane(Vector3.up, Vector3.zero);
-            if (!ground.Raycast(ray, out float enter)) return;
-            GridPosition cell = grid.WorldToGrid(ray.GetPoint(enter));
-            TryPlace(Selected, cell);
-        }
-
-        void TryCancelConstructionAtMouse()
-        {
-            if (worldCamera == null) return;
-            Ray ray = worldCamera.ScreenPointToRay(Input.mousePosition);
-            if (!Physics.Raycast(ray, out RaycastHit hit, 500f)) return;
-            ConstructionSite site = hit.collider.GetComponentInParent<ConstructionSite>();
-            if (site != null) site.CancelConstruction();
-        }
-
-        public bool TryPlace(BuildingDefinition definition, GridPosition cell)
-        {
-            if (definition == null || grid == null || !grid.InBounds(cell) || grid.IsOccupied(cell)) return false;
-            if (ledger != null && !ledger.CanSupply(definition.buildCosts))
-            {
-                Debug.Log($"[ShanMen] 建造 {definition.displayName} 失败：可搬运资源不足。");
-                return false;
-            }
-
-            if (!grid.TryOccupy(cell)) return false;
-            GameObject siteGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            siteGo.name = $"工地_{definition.displayName}";
-            siteGo.transform.position = grid.GridToWorld(cell) + Vector3.up * 0.18f;
-            siteGo.transform.localScale = new Vector3(0.82f, 0.3f, 0.82f);
-            SetColor(siteGo, new Color(0.78f, 0.68f, 0.35f));
-
-            ConstructionSite site = siteGo.AddComponent<ConstructionSite>();
-            site.Configure(definition, cell);
-            return true;
-        }
-
-        public void CompleteConstruction(ConstructionSite site)
-        {
-            if (site == null || site.Definition == null) return;
-            BuildingDefinition definition = site.Definition;
-            GridPosition cell = site.GridPosition;
-            site.MarkCompleted();
-            CreateCompletedBuilding(definition, cell, null);
-            Destroy(site.gameObject);
-        }
-
-        public GameObject CreateCompletedBuilding(BuildingDefinition definition, GridPosition cell, ResourceAmount[] startingResources)
-        {
-            if (definition == null || grid == null) return null;
-
-            GameObject go = GameObject.CreatePrimitive(definition.visualPrimitive);
-            go.name = definition.displayName;
-            go.transform.position = grid.GridToWorld(cell) + Vector3.up * definition.verticalOffset;
-            go.transform.localScale = definition.visualScale;
-            SetColor(go, definition.visualColor);
-
-            BuildingRuntime runtime = go.AddComponent<BuildingRuntime>();
-            runtime.Configure(definition, cell);
-
-            if (definition.behavior == BuildingBehavior.Storage)
-            {
-                var storageGo = new GameObject("Storage");
-                storageGo.transform.SetParent(go.transform, false);
-                ResourceContainer container = storageGo.AddComponent<ResourceContainer>();
-                container.Configure(ResourceContainerRole.Stockpile, definition.storageCapacity, Array.Empty<ResourceType>(), Array.Empty<ResourceTarget>());
-                container.SetStarting(startingResources ?? Array.Empty<ResourceAmount>());
-                container.Bind(ledger);
-            }
-
-            return go;
-        }
-
-        public GameObject CreateRefundDrop(Vector3 position, ResourceAmount[] resources)
-        {
-            if (resources == null || resources.Length == 0) return null;
-            int total = 0;
-            for (int i = 0; i < resources.Length; i++) total += Mathf.Max(0, resources[i].amount);
-            if (total <= 0) return null;
-
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = "返料堆";
-            go.transform.position = new Vector3(position.x, 0.18f, position.z);
-            go.transform.localScale = new Vector3(0.45f, 0.35f, 0.45f);
-            SetColor(go, new Color(0.82f, 0.7f, 0.34f));
-
-            ResourceContainer container = go.AddComponent<ResourceContainer>();
-            container.Configure(ResourceContainerRole.Output, total + 1, Array.Empty<ResourceType>(), Array.Empty<ResourceTarget>());
-            container.SetStarting(resources);
-            container.Bind(ledger);
-            go.AddComponent<ResourceDrop>();
-            return go;
-        }
-
-        static void SetColor(GameObject go, Color color)
-        {
-            Renderer renderer = go.GetComponent<Renderer>();
-            if (renderer != null) renderer.material.color = color;
-        }
+        public Camera worldCamera; public GridMap grid; public ResourceLedger ledger; public BuildingDefinition[] definitions=Array.Empty<BuildingDefinition>();
+        public int SelectedIndex{get;private set;}=-1; public BuildingDefinition Selected=>SelectedIndex>=0&&SelectedIndex<definitions.Length?definitions[SelectedIndex]:null; public event Action SelectionChanged;
+        public void SelectIndex(int index){int next=index>=0&&index<definitions.Length?index:-1;if(SelectedIndex==next)return;SelectedIndex=next;SelectionChanged?.Invoke();}
+        public void Cancel(){if(SelectedIndex<0)return;SelectedIndex=-1;SelectionChanged?.Invoke();}
+        void Start(){if(worldCamera==null)worldCamera=Camera.main;if(grid==null)grid=FindFirstObjectByType<GridMap>();if(ledger==null)ledger=FindFirstObjectByType<ResourceLedger>();}
+        void Update(){for(int i=0;i<definitions.Length&&i<9;i++){KeyCode key=(KeyCode)((int)KeyCode.Alpha1+i);if(Input.GetKeyDown(key))SelectIndex(i);}if(Input.GetMouseButtonDown(1)){if(EventSystem.current!=null&&EventSystem.current.IsPointerOverGameObject())return;if(Selected!=null)Cancel();else TryCancelConstructionAtMouse();return;}if(Selected!=null&&Input.GetMouseButtonDown(0)){if(EventSystem.current!=null&&EventSystem.current.IsPointerOverGameObject())return;TryPlaceAtMouse();}}
+        void TryPlaceAtMouse(){if(worldCamera==null||grid==null||Selected==null)return;Ray ray=worldCamera.ScreenPointToRay(Input.mousePosition);Plane ground=new Plane(Vector3.up,Vector3.zero);if(!ground.Raycast(ray,out float enter))return;TryPlace(Selected,grid.WorldToGrid(ray.GetPoint(enter)));}
+        void TryCancelConstructionAtMouse(){if(worldCamera==null)return;Ray ray=worldCamera.ScreenPointToRay(Input.mousePosition);if(!Physics.Raycast(ray,out RaycastHit hit,500f))return;ConstructionSite site=hit.collider.GetComponentInParent<ConstructionSite>();if(site!=null)site.CancelConstruction();}
+        public bool TryPlace(BuildingDefinition definition,GridPosition cell){if(definition==null||grid==null)return false;Vector2Int footprint=definition.NormalizedFootprint;bool rejectRoads=definition.behavior!=BuildingBehavior.Road;if(!grid.CanOccupyRect(cell,footprint,rejectRoads))return false;if(definition.behavior==BuildingBehavior.Road&&grid.HasRoad(cell))return false;if(ledger!=null&&!ledger.CanSupply(definition.buildCosts)){Debug.Log($"[ShanMen] 建造 {definition.displayName} 失败：可搬运资源不足。");return false;}if(!grid.TryOccupyRect(cell,footprint,rejectRoads))return false;GameObject siteGo=GameObject.CreatePrimitive(PrimitiveType.Cube);siteGo.name=$"工地_{definition.displayName}";siteGo.transform.position=grid.RectCenterToWorld(cell,footprint)+Vector3.up*0.18f;siteGo.transform.localScale=new Vector3(0.82f*footprint.x,0.3f,0.82f*footprint.y);SetColor(siteGo,new Color(0.78f,0.68f,0.35f));ConstructionSite site=siteGo.AddComponent<ConstructionSite>();site.Configure(definition,cell);return true;}
+        public void CompleteConstruction(ConstructionSite site){if(site==null||site.Definition==null)return;BuildingDefinition definition=site.Definition;GridPosition cell=site.GridPosition;site.MarkCompleted();if(definition.behavior==BuildingBehavior.Road&&grid!=null)grid.ReleaseRect(cell,definition.NormalizedFootprint);CreateCompletedBuilding(definition,cell,null);Destroy(site.gameObject);}
+        public GameObject CreateCompletedBuilding(BuildingDefinition definition,GridPosition cell,ResourceAmount[] startingResources){if(definition==null||grid==null)return null;Vector2Int footprint=definition.NormalizedFootprint;GameObject go=GameObject.CreatePrimitive(definition.visualPrimitive);go.name=definition.displayName;go.transform.position=grid.RectCenterToWorld(cell,footprint)+Vector3.up*definition.verticalOffset;go.transform.localScale=new Vector3(definition.visualScale.x*footprint.x,definition.visualScale.y,definition.visualScale.z*footprint.y);SetColor(go,definition.visualColor);BuildingRuntime runtime=go.AddComponent<BuildingRuntime>();runtime.Configure(definition,cell);if(definition.behavior==BuildingBehavior.Storage){var storageGo=new GameObject("Storage");storageGo.transform.SetParent(go.transform,false);ResourceContainer container=storageGo.AddComponent<ResourceContainer>();container.Configure(ResourceContainerRole.Stockpile,definition.storageCapacity,Array.Empty<ResourceType>(),Array.Empty<ResourceTarget>());container.SetStarting(startingResources??Array.Empty<ResourceAmount>());container.Bind(ledger);}return go;}
+        public GameObject CreateRefundDrop(Vector3 position,ResourceAmount[] resources)=>CreateResourceDrop(position,resources,"返料堆");
+        public GameObject CreateResourceDrop(Vector3 position,ResourceAmount[] resources,string objectName="资源堆"){if(resources==null||resources.Length==0)return null;int total=0;for(int i=0;i<resources.Length;i++)total+=Mathf.Max(0,resources[i].amount);if(total<=0)return null;GameObject go=GameObject.CreatePrimitive(PrimitiveType.Cube);go.name=objectName;go.transform.position=new Vector3(position.x,0.18f,position.z);go.transform.localScale=new Vector3(0.45f,0.35f,0.45f);SetColor(go,new Color(0.82f,0.7f,0.34f));ResourceContainer container=go.AddComponent<ResourceContainer>();container.Configure(ResourceContainerRole.Output,total+1,Array.Empty<ResourceType>(),Array.Empty<ResourceTarget>());container.SetStarting(resources);container.Bind(ledger);go.AddComponent<ResourceDrop>();return go;}
+        static void SetColor(GameObject go,Color color){Renderer renderer=go.GetComponent<Renderer>();if(renderer!=null)renderer.material.color=color;}
     }
 }
