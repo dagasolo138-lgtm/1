@@ -18,11 +18,14 @@ namespace ShanMen.Buildings
         ResourceLedger _ledger;
         BuildController _buildController;
         ResourceContainer _materials;
+        Job _buildJob;
         bool _jobOutstanding;
         bool _subscribed;
+        bool _finished;
 
         public BuildingDefinition Definition => definition;
         public GridPosition GridPosition => gridPosition;
+        public ResourceContainer Materials => _materials;
 
         public void Configure(BuildingDefinition newDefinition, GridPosition cell)
         {
@@ -50,6 +53,10 @@ namespace ShanMen.Buildings
         void OnDestroy()
         {
             if (_subscribed && _clock != null) _clock.Tick -= OnTick;
+            if (_finished) return;
+            if (_buildJob != null && _jobs != null) _jobs.Cancel(_buildJob);
+            if (_materials != null && _jobs != null) _jobs.CancelHaulsForContainer(_materials);
+            if (_grid != null) _grid.Release(gridPosition);
         }
 
         void EnsureMaterialContainer()
@@ -85,12 +92,38 @@ namespace ShanMen.Buildings
             if (!_materials.Has(definition.buildCosts)) return;
 
             _jobOutstanding = true;
-            _jobs.Add(JobType.Build, transform.position, definition.buildWork, () =>
+            _buildJob = _jobs.Add(JobType.Build, transform.position, definition.buildWork, () =>
             {
                 _jobOutstanding = false;
+                _buildJob = null;
                 if (!_materials.TryConsume(definition.buildCosts)) return;
                 if (_buildController != null) _buildController.CompleteConstruction(this);
             });
+        }
+
+        public void MarkCompleted()
+        {
+            _finished = true;
+        }
+
+        public void CancelConstruction()
+        {
+            if (_finished) return;
+
+            if (_buildJob != null && _jobs != null)
+            {
+                _jobs.Cancel(_buildJob);
+                _buildJob = null;
+            }
+
+            if (_materials != null && _jobs != null) _jobs.CancelHaulsForContainer(_materials);
+            ResourceAmount[] refund = _materials != null ? _materials.SnapshotContents() : Array.Empty<ResourceAmount>();
+            if (_buildController != null && refund.Length > 0)
+                _buildController.CreateRefundDrop(transform.position, refund);
+
+            if (_grid != null) _grid.Release(gridPosition);
+            _finished = true;
+            Destroy(gameObject);
         }
     }
 }
