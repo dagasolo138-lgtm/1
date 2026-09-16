@@ -78,7 +78,7 @@ namespace ShanMen.UI
             panelRect.anchorMax = new Vector2(1f, 1f);
             panelRect.pivot = new Vector2(1f, 1f);
             panelRect.anchoredPosition = new Vector2(-18f, -18f);
-            panelRect.sizeDelta = new Vector2(650f, 92f + Mathf.Max(1, agents.Length) * 46f);
+            panelRect.sizeDelta = new Vector2(715f, 92f + Mathf.Max(1, agents.Length) * 46f);
             Image panelImage = panelGo.AddComponent<Image>();
             panelImage.color = new Color(0.08f, 0.09f, 0.11f, 0.92f);
             VerticalLayoutGroup vertical = panelGo.AddComponent<VerticalLayoutGroup>();
@@ -93,7 +93,7 @@ namespace ShanMen.UI
 
             GameObject header = CreateRow("Header", panelGo.transform, 34f);
             AddCell(header.transform, "弟子", 86f, 14, TextAnchor.MiddleLeft);
-            AddCell(header.transform, "当前", 145f, 14, TextAnchor.MiddleLeft);
+            AddCell(header.transform, "当前 / 需求", 210f, 14, TextAnchor.MiddleLeft);
             for (int i = 0; i < JobColumns.Length; i++)
                 AddCell(header.transform, CultivatorAgent.JobLabel(JobColumns[i]), 72f, 14, TextAnchor.MiddleCenter);
 
@@ -103,7 +103,7 @@ namespace ShanMen.UI
                 if (agent == null) continue;
                 GameObject row = CreateRow($"Agent_{i}", panelGo.transform, 40f);
                 AddCell(row.transform, agent.displayName, 86f, 14, TextAnchor.MiddleLeft);
-                Text status = AddCell(row.transform, string.Empty, 145f, 13, TextAnchor.MiddleLeft);
+                Text status = AddCell(row.transform, string.Empty, 210f, 13, TextAnchor.MiddleLeft);
                 _statusBindings.Add(new AgentStatusBinding { agent = agent, text = status });
 
                 for (int j = 0; j < JobColumns.Length; j++)
@@ -156,6 +156,7 @@ namespace ShanMen.UI
         Text AddCell(Transform parent, string value, float width, int size, TextAnchor anchor)
         {
             Text text = CreateText(value, parent, size, anchor);
+            text.text = value;
             text.gameObject.AddComponent<LayoutElement>().preferredWidth = width;
             return text;
         }
@@ -207,7 +208,9 @@ namespace ShanMen.UI
                 AgentStatusBinding binding = _statusBindings[i];
                 if (binding.agent == null || binding.text == null) continue;
                 string carry = binding.agent.CarryingText;
-                binding.text.text = string.IsNullOrEmpty(carry) ? binding.agent.CurrentJobName : $"{binding.agent.CurrentJobName} / {carry}";
+                string state = string.IsNullOrEmpty(carry) ? binding.agent.CurrentJobName : $"{binding.agent.CurrentJobName} / {carry}";
+                string needs = binding.agent.NeedText;
+                binding.text.text = string.IsNullOrEmpty(needs) ? state : $"{state} / {needs}";
             }
         }
     }
