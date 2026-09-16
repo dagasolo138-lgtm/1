@@ -15,13 +15,22 @@ namespace ShanMen.Buildings
 
         public int SelectedIndex { get; private set; } = -1;
         public BuildingDefinition Selected => SelectedIndex >= 0 && SelectedIndex < definitions.Length ? definitions[SelectedIndex] : null;
+        public event Action SelectionChanged;
 
         public void SelectIndex(int index)
         {
-            SelectedIndex = index >= 0 && index < definitions.Length ? index : -1;
+            int next = index >= 0 && index < definitions.Length ? index : -1;
+            if (SelectedIndex == next) return;
+            SelectedIndex = next;
+            SelectionChanged?.Invoke();
         }
 
-        public void Cancel() => SelectedIndex = -1;
+        public void Cancel()
+        {
+            if (SelectedIndex < 0) return;
+            SelectedIndex = -1;
+            SelectionChanged?.Invoke();
+        }
 
         void Start()
         {
@@ -38,7 +47,14 @@ namespace ShanMen.Buildings
                 if (Input.GetKeyDown(key)) SelectIndex(i);
             }
 
-            if (Input.GetMouseButtonDown(1)) Cancel();
+            if (Input.GetMouseButtonDown(1))
+            {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+                if (Selected != null) Cancel();
+                else TryCancelConstructionAtMouse();
+                return;
+            }
+
             if (Selected != null && Input.GetMouseButtonDown(0))
             {
                 if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
@@ -54,6 +70,15 @@ namespace ShanMen.Buildings
             if (!ground.Raycast(ray, out float enter)) return;
             GridPosition cell = grid.WorldToGrid(ray.GetPoint(enter));
             TryPlace(Selected, cell);
+        }
+
+        void TryCancelConstructionAtMouse()
+        {
+            if (worldCamera == null) return;
+            Ray ray = worldCamera.ScreenPointToRay(Input.mousePosition);
+            if (!Physics.Raycast(ray, out RaycastHit hit, 500f)) return;
+            ConstructionSite site = hit.collider.GetComponentInParent<ConstructionSite>();
+            if (site != null) site.CancelConstruction();
         }
 
         public bool TryPlace(BuildingDefinition definition, GridPosition cell)
@@ -82,6 +107,7 @@ namespace ShanMen.Buildings
             if (site == null || site.Definition == null) return;
             BuildingDefinition definition = site.Definition;
             GridPosition cell = site.GridPosition;
+            site.MarkCompleted();
             CreateCompletedBuilding(definition, cell, null);
             Destroy(site.gameObject);
         }
@@ -106,8 +132,30 @@ namespace ShanMen.Buildings
                 ResourceContainer container = storageGo.AddComponent<ResourceContainer>();
                 container.Configure(ResourceContainerRole.Stockpile, definition.storageCapacity, Array.Empty<ResourceType>(), Array.Empty<ResourceTarget>());
                 container.SetStarting(startingResources ?? Array.Empty<ResourceAmount>());
+                container.Bind(ledger);
             }
 
+            return go;
+        }
+
+        public GameObject CreateRefundDrop(Vector3 position, ResourceAmount[] resources)
+        {
+            if (resources == null || resources.Length == 0) return null;
+            int total = 0;
+            for (int i = 0; i < resources.Length; i++) total += Mathf.Max(0, resources[i].amount);
+            if (total <= 0) return null;
+
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "返料堆";
+            go.transform.position = new Vector3(position.x, 0.18f, position.z);
+            go.transform.localScale = new Vector3(0.45f, 0.35f, 0.45f);
+            SetColor(go, new Color(0.82f, 0.7f, 0.34f));
+
+            ResourceContainer container = go.AddComponent<ResourceContainer>();
+            container.Configure(ResourceContainerRole.Output, total + 1, Array.Empty<ResourceType>(), Array.Empty<ResourceTarget>());
+            container.SetStarting(resources);
+            container.Bind(ledger);
+            go.AddComponent<ResourceDrop>();
             return go;
         }
 
