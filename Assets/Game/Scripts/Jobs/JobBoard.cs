@@ -119,6 +119,19 @@ namespace ShanMen.Jobs
             if (_jobs.Remove(job)) ReleaseHaulReservations(job);
         }
 
+        public void CancelHaulsForContainer(ResourceContainer container)
+        {
+            if (container == null) return;
+            for (int i = _jobs.Count - 1; i >= 0; i--)
+            {
+                Job job = _jobs[i];
+                if (!job.IsHaul) continue;
+                if (job.haulSource != container && job.haulDestination != container) continue;
+                _jobs.RemoveAt(i);
+                ReleaseHaulReservations(job);
+            }
+        }
+
         public void CancelReservation(Job job)
         {
             if (job != null) job.Reserved = false;
