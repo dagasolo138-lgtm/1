@@ -1,10 +1,8 @@
-using System.Collections.Generic;
-using ShanMen.Core;
-using ShanMen.Cultivation;
+using System;
 using ShanMen.Economy;
 using ShanMen.Grid;
-using ShanMen.Jobs;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace ShanMen.Buildings
 {
@@ -13,57 +11,110 @@ namespace ShanMen.Buildings
         public Camera worldCamera;
         public GridMap grid;
         public ResourceLedger ledger;
-        public GameClock clock;
-        public JobBoard jobs;
-        public QiField qiField;
-        public BuildingType? Selected { get; private set; }
+        public BuildingDefinition[] definitions = Array.Empty<BuildingDefinition>();
 
-        readonly Dictionary<BuildingType, ResourceCost[]> _costs = new()
+        public int SelectedIndex { get; private set; } = -1;
+        public BuildingDefinition Selected => SelectedIndex >= 0 && SelectedIndex < definitions.Length ? definitions[SelectedIndex] : null;
+
+        public void SelectIndex(int index)
         {
-            [BuildingType.SpiritField] = new[] { new ResourceCost(ResourceType.Wood, 8) },
-            [BuildingType.Workshop] = new[] { new ResourceCost(ResourceType.Wood, 15), new ResourceCost(ResourceType.Stone, 12) },
-            [BuildingType.MeditationMat] = new[] { new ResourceCost(ResourceType.Wood, 10), new ResourceCost(ResourceType.Stone, 3) },
-            [BuildingType.SpiritGatherer] = new[] { new ResourceCost(ResourceType.Stone, 18), new ResourceCost(ResourceType.SpiritStone, 4) },
-        };
+            SelectedIndex = index >= 0 && index < definitions.Length ? index : -1;
+        }
 
-        public void Select(BuildingType type) => Selected = type;
-        public void Cancel() => Selected = null;
+        public void Cancel() => SelectedIndex = -1;
+
+        void Start()
+        {
+            if (worldCamera == null) worldCamera = Camera.main;
+            if (grid == null) grid = FindFirstObjectByType<GridMap>();
+            if (ledger == null) ledger = FindFirstObjectByType<ResourceLedger>();
+        }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1)) Select(BuildingType.SpiritField);
-            if (Input.GetKeyDown(KeyCode.Alpha2)) Select(BuildingType.Workshop);
-            if (Input.GetKeyDown(KeyCode.Alpha3)) Select(BuildingType.MeditationMat);
-            if (Input.GetKeyDown(KeyCode.Alpha4)) Select(BuildingType.SpiritGatherer);
+            for (int i = 0; i < definitions.Length && i < 9; i++)
+            {
+                KeyCode key = (KeyCode)((int)KeyCode.Alpha1 + i);
+                if (Input.GetKeyDown(key)) SelectIndex(i);
+            }
+
             if (Input.GetMouseButtonDown(1)) Cancel();
-            if (Selected.HasValue && Input.GetMouseButtonDown(0)) TryPlaceAtMouse();
+            if (Selected != null && Input.GetMouseButtonDown(0))
+            {
+                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+                TryPlaceAtMouse();
+            }
         }
 
         void TryPlaceAtMouse()
         {
-            if (worldCamera == null || grid == null) return;
+            if (worldCamera == null || grid == null || Selected == null) return;
             Ray ray = worldCamera.ScreenPointToRay(Input.mousePosition);
-            Plane ground = new(Vector3.up, Vector3.zero);
+            Plane ground = new Plane(Vector3.up, Vector3.zero);
             if (!ground.Raycast(ray, out float enter)) return;
-            Vector3 point = ray.GetPoint(enter);
-            GridPosition cell = grid.WorldToGrid(point);
-            if (!grid.InBounds(cell) || grid.IsOccupied(cell)) return;
+            GridPosition cell = grid.WorldToGrid(ray.GetPoint(enter));
+            TryPlace(Selected, cell);
+        }
 
-            BuildingType type = Selected.Value;
-            ResourceCost[] costs = _costs[type];
-            if (!ledger.Spend(costs)) return;
-            if (!grid.TryOccupy(cell)) return;
+        public bool TryPlace(BuildingDefinition definition, GridPosition cell)
+        {
+            if (definition == null || grid == null || !grid.InBounds(cell) || grid.IsOccupied(cell)) return false;
+            if (ledger != null && !ledger.CanSupply(definition.buildCosts))
+            {
+                Debug.Log($"[ShanMen] 建造 {definition.displayName} 失败：可搬运资源不足。");
+                return false;
+            }
 
-            GameObject go = GameObject.CreatePrimitive(type == BuildingType.MeditationMat ? PrimitiveType.Cylinder : PrimitiveType.Cube);
-            go.name = type.ToString();
-            go.transform.position = grid.GridToWorld(cell) + Vector3.up * (type == BuildingType.MeditationMat ? 0.08f : 0.5f);
-            go.transform.localScale = type == BuildingType.MeditationMat ? new Vector3(0.75f, 0.08f, 0.75f) : new Vector3(0.9f, 1f, 0.9f);
+            if (!grid.TryOccupy(cell)) return false;
+            GameObject siteGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            siteGo.name = $"工地_{definition.displayName}";
+            siteGo.transform.position = grid.GridToWorld(cell) + Vector3.up * 0.18f;
+            siteGo.transform.localScale = new Vector3(0.82f, 0.3f, 0.82f);
+            SetColor(siteGo, new Color(0.78f, 0.68f, 0.35f));
 
-            var runtime = go.AddComponent<BuildingRuntime>();
-            runtime.type = type;
-            runtime.gridPosition = cell;
-            runtime.Bind(clock, jobs, ledger, qiField);
-            runtime.InitializeSpecials();
+            ConstructionSite site = siteGo.AddComponent<ConstructionSite>();
+            site.Configure(definition, cell);
+            return true;
+        }
+
+        public void CompleteConstruction(ConstructionSite site)
+        {
+            if (site == null || site.Definition == null) return;
+            BuildingDefinition definition = site.Definition;
+            GridPosition cell = site.GridPosition;
+            CreateCompletedBuilding(definition, cell, null);
+            Destroy(site.gameObject);
+        }
+
+        public GameObject CreateCompletedBuilding(BuildingDefinition definition, GridPosition cell, ResourceAmount[] startingResources)
+        {
+            if (definition == null || grid == null) return null;
+
+            GameObject go = GameObject.CreatePrimitive(definition.visualPrimitive);
+            go.name = definition.displayName;
+            go.transform.position = grid.GridToWorld(cell) + Vector3.up * definition.verticalOffset;
+            go.transform.localScale = definition.visualScale;
+            SetColor(go, definition.visualColor);
+
+            BuildingRuntime runtime = go.AddComponent<BuildingRuntime>();
+            runtime.Configure(definition, cell);
+
+            if (definition.behavior == BuildingBehavior.Storage)
+            {
+                var storageGo = new GameObject("Storage");
+                storageGo.transform.SetParent(go.transform, false);
+                ResourceContainer container = storageGo.AddComponent<ResourceContainer>();
+                container.Configure(ResourceContainerRole.Stockpile, definition.storageCapacity, Array.Empty<ResourceType>(), Array.Empty<ResourceTarget>());
+                container.SetStarting(startingResources ?? Array.Empty<ResourceAmount>());
+            }
+
+            return go;
+        }
+
+        static void SetColor(GameObject go, Color color)
+        {
+            Renderer renderer = go.GetComponent<Renderer>();
+            if (renderer != null) renderer.material.color = color;
         }
     }
 }
